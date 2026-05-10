@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  test:
+    name: Test (Java/Angular auto-detect)
+    runs-on: ubuntu-latest
+    env:
+      JAVA_DIR: java/G-rez-l-int-gration-et-la-livraison-continue-Application-Java
+      ANGULAR_DIR: angular/G-rez-l-int-gration-et-la-livraison-continue-Application-Angular
+      TEST_RESULTS_DIR: test-results
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect project types
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          has_java=false
+          has_angular=false
+
+          if [[ -f "${JAVA_DIR}/build.gradle" && -x "${JAVA_DIR}/gradlew" ]]; then
+            has_java=true
+          fi
+          if [[ -f "${ANGULAR_DIR}/package.json" ]]; then
+            has_angular=true
+          fi
+
+          echo "has_java=${has_java}" >> "$GITHUB_OUTPUT"
+          echo "has_angular=${has_angular}" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if no supported project found
+        if: steps.detect.outputs.has_java != 'true' && steps.detect.outputs.has_angular != 'true'
+        run: |
+          echo "Aucun projet Java ou Angular détecté avec la convention attendue." >&2
+          exit 1
+
+      - name: Prepare clean test-results directory
+        run: |
+          rm -rf "${TEST_RESULTS_DIR}"
+          mkdir -p "${TEST_RESULTS_DIR}/java" "${TEST_RESULTS_DIR}/angular"
+
+      - name: Setup Java 21
+        if: steps.detect.outputs.has_java == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Run Java tests
+        if: steps.detect.outputs.has_java == 'true'
+        working-directory: ${{ env.JAVA_DIR }}
+        run: ./gradlew clean test
+
+      - name: Collect Java JUnit XML reports
+        if: always() && steps.detect.outputs.has_java == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="${JAVA_DIR}/build/test-results/test"
+          if [[ -d "${src}" ]]; then
+            shopt -s nullglob
+            files=("${src}"/*.xml)
+            shopt -u nullglob
+            if ((${#files[@]})); then
+              cp "${files[@]}" "${TEST_RESULTS_DIR}/java/"
+            fi
+          fi
+
+      - name: Setup Node.js 22
+        if: steps.detect.outputs.has_angular == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ${{ env.ANGULAR_DIR }}/package-lock.json
+
+      - name: Install Angular dependencies
+        if: steps.detect.outputs.has_angular == 'true'
+        working-directory: ${{ env.ANGULAR_DIR }}
+        run: npm ci
+
+      - name: Run Angular tests
+        if: steps.detect.outputs.has_angular == 'true'
+        working-directory: ${{ env.ANGULAR_DIR }}
+        env:
+          KARMA_JUNIT_OUTPUT_DIR: ${{ github.workspace }}/${{ env.TEST_RESULTS_DIR }}/angular
+        run: npm test
+
+      - name: Upload test XML artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml-reports
+          path: ${{ env.TEST_RESULTS_DIR }}/**/*.xml
+          if-no-files-found: warn
+
+      - name: Publish JUnit report in GitHub UI
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results/**/*.xml
+          check_name: CI - Test report
