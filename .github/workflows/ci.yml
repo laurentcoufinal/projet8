@@ -5,6 +5,11 @@ on:
   push:
     branches:
       - "**"
+    paths-ignore:
+      - README.md
+      - test-results/
+      - .gitignore
+      - '.github/workflows/*.yml'
   pull_request:
 
 permissions:
@@ -23,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Detect project types
         id: detect
@@ -38,6 +45,15 @@ jobs:
           if [[ -f "${ANGULAR_DIR}/package.json" ]]; then
             has_angular=true
           fi
+
+          # #region agent log
+          mkdir -p .cursor
+          _ts=$(($(date +%s) * 1000))
+          _jbg=false; [[ -f "${JAVA_DIR}/build.gradle" ]] && _jbg=true
+          _jgx=false; [[ -x "${JAVA_DIR}/gradlew" ]] && _jgx=true
+          _apk=false; [[ -f "${ANGULAR_DIR}/package.json" ]] && _apk=true
+          printf '%s\n' "{\"sessionId\":\"686be6\",\"runId\":\"${GITHUB_RUN_ID:-local}\",\"hypothesisId\":\"H1\",\"location\":\"ci.yml:Detect project types\",\"message\":\"detection après checkout\",\"data\":{\"has_java\":\"${has_java}\",\"has_angular\":\"${has_angular}\",\"java_build_gradle\":\"${_jbg}\",\"java_gradlew_exec\":\"${_jgx}\",\"angular_package_json\":\"${_apk}\"},\"timestamp\":${_ts}}" >> ".cursor/debug-686be6.log" || true
+          # #endregion
 
           echo "has_java=${has_java}" >> "$GITHUB_OUTPUT"
           echo "has_angular=${has_angular}" >> "$GITHUB_OUTPUT"
