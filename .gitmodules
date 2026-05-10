@@ -1,6 +1,0 @@
-[submodule "angular-app"]
-	path = angular/G-rez-l-int-gration-et-la-livraison-continue-Application-Angular
-	url = https://github.com/OpenClassrooms-Student-Center/G-rez-l-int-gration-et-la-livraison-continue-Application-Angular.git
-[submodule "java-app"]
-	path = java/G-rez-l-int-gration-et-la-livraison-continue-Application-Java
-	url = https://github.com/OpenClassrooms-Student-Center/G-rez-l-int-gration-et-la-livraison-continue-Application-Java.git
