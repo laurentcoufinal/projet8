@@ -1,0 +1,27 @@
+# Backend Java + PostgreSQL (image CI : …:java-latest)
+# Usage : docker compose -f docker-compose.java.yml up -d
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: workshops_user
+      POSTGRES_PASSWORD: oc2024
+      POSTGRES_DB: workshopsdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshops_user -d workshopsdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: laurentcoufinal/projet8:java-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://db:5432/workshopsdb"
+      SPRING_DATASOURCE_USERNAME: workshops_user
+      SPRING_DATASOURCE_PASSWORD: oc2024

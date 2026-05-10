@@ -1,0 +1,35 @@
+# Images publiées par la CI : laurentcoufinal/projet8:java-* et :angular-*
+# Usage : docker compose pull && docker compose up -d
+# Variables optionnelles : IMAGE_REGISTRY, JAVA_IMAGE_TAG, ANGULAR_IMAGE_TAG
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: workshops_user
+      POSTGRES_PASSWORD: oc2024
+      POSTGRES_DB: workshopsdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workshops_user -d workshopsdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${IMAGE_REGISTRY:-laurentcoufinal}/projet8:${JAVA_IMAGE_TAG:-java-latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://db:5432/workshopsdb"
+      SPRING_DATASOURCE_USERNAME: workshops_user
+      SPRING_DATASOURCE_PASSWORD: oc2024
+
+  web:
+    image: ${IMAGE_REGISTRY:-laurentcoufinal}/projet8:${ANGULAR_IMAGE_TAG:-angular-latest}
+    depends_on:
+      - api
+    ports:
+      - "80:80"

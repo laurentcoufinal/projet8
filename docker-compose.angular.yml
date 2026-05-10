@@ -1,0 +1,8 @@
+# Frontend Angular / nginx (image CI : …:angular-latest)
+# Usage : docker compose -f docker-compose.angular.yml up -d
+
+services:
+  web:
+    image: ${IMAGE_REGISTRY:-laurentcoufinal}/projet8:${ANGULAR_IMAGE_TAG:-angular-latest}
+    ports:
+      - "80:80"
