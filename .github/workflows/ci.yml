@@ -20,7 +20,6 @@ on:
       - README.md
       - test-results/
       - .gitignore
-      - '.github/workflows/*.yml'
   pull_request:
 
 permissions:
