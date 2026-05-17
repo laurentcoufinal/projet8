@@ -196,6 +196,7 @@ jobs:
     steps:
       - name: Prepare report directories
         run: |
+          rm -rf test-results/
           mkdir -p test-results/java test-results/angular
 
       - name: Download JUnit (Java)
