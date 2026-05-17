@@ -29,8 +29,9 @@ jobs:
     steps:
       - name: Prepare report directories
         run: |
-          rm -rf test-results/
+          rm -rf test-results/ .ci-staging/
           mkdir -p test-results/java test-results/angular
+          mkdir -p .ci-staging/java .ci-staging/angular
 
       - name: Download JUnit (Java)
         if: inputs.has_java == 'true' && inputs.test_java_result == 'success'
@@ -38,7 +39,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: junit-xml-java
-          path: test-results/java
+          path: .ci-staging/java
 
       - name: Download JUnit (Angular)
         if: inputs.has_angular == 'true' && inputs.test_angular_result == 'success'
@@ -46,7 +47,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: junit-xml-angular
-          path: test-results/angular
+          path: .ci-staging/angular
+
+      - name: Stage downloaded JUnit reports
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for stack in java angular; do
+            src=".ci-staging/${stack}"
+            dest="test-results/${stack}"
+            mkdir -p "${dest}"
+            if [[ -d "${src}" ]]; then
+              find "${src}" -name '*.xml' -print0 | xargs -0 -r cp -t "${dest}"
+            fi
+          done
 
       - name: Upload test XML artifacts (agrégé)
         if: always()
