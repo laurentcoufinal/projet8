@@ -13,14 +13,6 @@ on:
         required: false
         default: "22"
         type: string
-  push:
-    branches:
-      - "**"
-    paths-ignore:
-      - README.md
-      - test-results/
-      - .gitignore
-  pull_request:
 
 permissions:
   contents: read

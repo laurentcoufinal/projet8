@@ -1,0 +1,61 @@
+name: Test Java
+
+on:
+  workflow_call:
+    inputs:
+      project_dir:
+        type: string
+        required: true
+      java_version:
+        type: string
+        required: true
+      test_results_dir:
+        type: string
+        required: true
+
+jobs:
+  test-java:
+    name: Tests Java (Gradle)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version }}
+          cache: gradle
+
+      - name: Prepare test-results (Java)
+        run: |
+          rm -rf "${{ inputs.test_results_dir }}/java"
+          mkdir -p "${{ inputs.test_results_dir }}/java"
+
+      - name: Run Java tests
+        working-directory: ${{ inputs.project_dir }}
+        run: ./gradlew clean test
+
+      - name: Collect Java JUnit XML reports
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="${{ inputs.project_dir }}/build/test-results/test"
+          if [[ -d "${src}" ]]; then
+            shopt -s nullglob
+            files=("${src}"/*.xml)
+            shopt -u nullglob
+            if ((${#files[@]})); then
+              cp "${files[@]}" "${{ inputs.test_results_dir }}/java/"
+            fi
+          fi
+
+      - name: Upload JUnit (Java)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml-java
+          path: ${{ inputs.test_results_dir }}/java
+          if-no-files-found: warn

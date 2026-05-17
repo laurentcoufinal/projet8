@@ -1,0 +1,55 @@
+name: Test Angular
+
+on:
+  workflow_call:
+    inputs:
+      project_dir:
+        type: string
+        required: true
+      node_version:
+        type: string
+        required: true
+      test_results_dir:
+        type: string
+        required: true
+      package_lock_path:
+        type: string
+        required: true
+
+jobs:
+  test-angular:
+    name: Tests Angular (npm / Karma)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.package_lock_path }}
+
+      - name: Prepare test-results (Angular)
+        run: |
+          rm -rf "${{ inputs.test_results_dir }}/angular"
+          mkdir -p "${{ inputs.test_results_dir }}/angular"
+
+      - name: Install Angular dependencies
+        working-directory: ${{ inputs.project_dir }}
+        run: npm ci
+
+      - name: Run Angular tests
+        working-directory: ${{ inputs.project_dir }}
+        env:
+          KARMA_JUNIT_OUTPUT_DIR: ${{ github.workspace }}/${{ inputs.test_results_dir }}/angular
+        run: npm test
+
+      - name: Upload JUnit (Angular)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml-angular
+          path: ${{ inputs.test_results_dir }}/angular
+          if-no-files-found: warn

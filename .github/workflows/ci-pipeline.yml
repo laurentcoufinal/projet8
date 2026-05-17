@@ -1,0 +1,153 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - "**"
+    paths-ignore:
+      - README.md
+      - test-results/
+      - .gitignore
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  packages: write
+
+jobs:
+  load-config:
+    name: Charger ci-config.yml
+    runs-on: ubuntu-latest
+    outputs:
+      java_enabled: ${{ steps.cfg.outputs.java_enabled }}
+      java_project_dir: ${{ steps.cfg.outputs.java_project_dir }}
+      java_version_default: ${{ steps.cfg.outputs.java_version_default }}
+      angular_enabled: ${{ steps.cfg.outputs.angular_enabled }}
+      angular_project_dir: ${{ steps.cfg.outputs.angular_project_dir }}
+      node_version_default: ${{ steps.cfg.outputs.node_version_default }}
+      test_results_dir: ${{ steps.cfg.outputs.test_results_dir }}
+      angular_package_lock: ${{ steps.cfg.outputs.angular_package_lock }}
+      docker_context: ${{ steps.cfg.outputs.docker_context }}
+      java_dockerfile: ${{ steps.cfg.outputs.java_dockerfile }}
+      angular_dockerfile: ${{ steps.cfg.outputs.angular_dockerfile }}
+      java_image_prefix: ${{ steps.cfg.outputs.java_image_prefix }}
+      angular_image_prefix: ${{ steps.cfg.outputs.angular_image_prefix }}
+      docker_environment: ${{ steps.cfg.outputs.docker_environment }}
+      dockerhub_repository: ${{ steps.cfg.outputs.dockerhub_repository }}
+      report_check_name: ${{ steps.cfg.outputs.report_check_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse ci-config.yml
+        id: cfg
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip install -q pyyaml
+          python3 <<'PY'
+          import os
+          import yaml
+
+          with open(".github/ci-config.yml") as f:
+              cfg = yaml.safe_load(f)
+
+          d = cfg.get("defaults", {})
+          stacks = cfg.get("stacks", {})
+          docker = cfg.get("docker", {})
+          report = cfg.get("report", {})
+
+          def out(k, v):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as g:
+                  g.write(f"{k}={v}\n")
+
+          java = stacks.get("java", {})
+          angular = stacks.get("angular", {})
+          dh = docker.get("dockerhub", {})
+
+          out("java_enabled", str(java.get("enabled", False)).lower())
+          out("java_project_dir", java.get("project_dir", ""))
+          out("java_version_default", java.get("java_version", d.get("java_version", "21")))
+          out("angular_enabled", str(angular.get("enabled", False)).lower())
+          out("angular_project_dir", angular.get("project_dir", ""))
+          out("node_version_default", angular.get("node_version", d.get("node_version", "22")))
+          out("test_results_dir", d.get("test_results_dir", "test-results"))
+          lock = angular.get("package_lock", "package-lock.json")
+          out("angular_package_lock", f"{angular.get('project_dir', '')}/{lock}")
+          out("docker_context", docker.get("context", "."))
+          out("java_dockerfile", docker.get("java", {}).get("dockerfile", "docker/java.Dockerfile"))
+          out("angular_dockerfile", docker.get("angular", {}).get("dockerfile", "docker/angular.Dockerfile"))
+          out("java_image_prefix", docker.get("java", {}).get("image_prefix", "java"))
+          out("angular_image_prefix", docker.get("angular", {}).get("image_prefix", "angular"))
+          out("docker_environment", docker.get("environment", "dev"))
+          out("dockerhub_repository", dh.get("repository", ""))
+          out("report_check_name", report.get("check_name", "CI - Test report"))
+          PY
+
+  detect:
+    name: Détection
+    needs: load-config
+    uses: ./.github/workflows/detect.yml
+    with:
+      java_enabled: ${{ needs.load-config.outputs.java_enabled == 'true' }}
+      java_project_dir: ${{ needs.load-config.outputs.java_project_dir }}
+      angular_enabled: ${{ needs.load-config.outputs.angular_enabled == 'true' }}
+      angular_project_dir: ${{ needs.load-config.outputs.angular_project_dir }}
+      java_version: ${{ needs.load-config.outputs.java_version_default }}
+      node_version: ${{ needs.load-config.outputs.node_version_default }}
+
+  test-java:
+    name: Tests Java
+    needs: [load-config, detect]
+    if: needs.detect.outputs.has_java == 'true'
+    uses: ./.github/workflows/test-java.yml
+    with:
+      project_dir: ${{ needs.load-config.outputs.java_project_dir }}
+      java_version: ${{ needs.detect.outputs.java_version }}
+      test_results_dir: ${{ needs.load-config.outputs.test_results_dir }}
+
+  test-angular:
+    name: Tests Angular
+    needs: [load-config, detect]
+    if: needs.detect.outputs.has_angular == 'true'
+    uses: ./.github/workflows/test-angular.yml
+    with:
+      project_dir: ${{ needs.load-config.outputs.angular_project_dir }}
+      node_version: ${{ needs.detect.outputs.node_version }}
+      test_results_dir: ${{ needs.load-config.outputs.test_results_dir }}
+      package_lock_path: ${{ needs.load-config.outputs.angular_package_lock }}
+
+  report-tests:
+    name: Rapport tests
+    needs: [load-config, detect, test-java, test-angular]
+    if: always() && needs.detect.result == 'success'
+    uses: ./.github/workflows/report-tests.yml
+    with:
+      has_java: ${{ needs.detect.outputs.has_java }}
+      has_angular: ${{ needs.detect.outputs.has_angular }}
+      check_name: ${{ needs.load-config.outputs.report_check_name }}
+
+  docker-images:
+    name: Images Docker
+    needs: [load-config, detect, test-java, test-angular]
+    if: >-
+      always() &&
+      needs.detect.result == 'success' &&
+      (needs.test-java.result == 'success' || needs.test-java.result == 'skipped') &&
+      (needs.test-angular.result == 'success' || needs.test-angular.result == 'skipped') &&
+      needs.test-java.result != 'failure' &&
+      needs.test-angular.result != 'failure' &&
+      (needs.detect.outputs.has_java == 'true' || needs.detect.outputs.has_angular == 'true')
+    uses: ./.github/workflows/docker-images.yml
+    secrets: inherit
+    with:
+      has_java: ${{ needs.detect.outputs.has_java }}
+      has_angular: ${{ needs.detect.outputs.has_angular }}
+      docker_context: ${{ needs.load-config.outputs.docker_context }}
+      java_dockerfile: ${{ needs.load-config.outputs.java_dockerfile }}
+      angular_dockerfile: ${{ needs.load-config.outputs.angular_dockerfile }}
+      java_image_prefix: ${{ needs.load-config.outputs.java_image_prefix }}
+      angular_image_prefix: ${{ needs.load-config.outputs.angular_image_prefix }}
+      docker_environment: ${{ needs.load-config.outputs.docker_environment }}
+      dockerhub_repository: ${{ needs.load-config.outputs.dockerhub_repository }}

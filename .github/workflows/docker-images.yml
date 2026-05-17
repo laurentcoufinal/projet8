@@ -1,0 +1,163 @@
+name: Docker images
+
+on:
+  workflow_call:
+    inputs:
+      has_java:
+        type: string
+        required: true
+      has_angular:
+        type: string
+        required: true
+      docker_context:
+        type: string
+        required: true
+      java_dockerfile:
+        type: string
+        required: true
+      angular_dockerfile:
+        type: string
+        required: true
+      java_image_prefix:
+        type: string
+        required: true
+      angular_image_prefix:
+        type: string
+        required: true
+      docker_environment:
+        type: string
+        required: false
+        default: dev
+      dockerhub_repository:
+        type: string
+        required: false
+        default: ""
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+jobs:
+  docker-images:
+    name: Images Docker (build / push)
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.docker_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Hub credentials check
+        id: dockerhub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GITHUB_ENVIRONMENT_NAME: ${{ github.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
+            ready=true
+          fi
+          echo "ready=${ready}" >> "${GITHUB_OUTPUT}"
+
+          if [[ "${ready}" != "true" ]]; then
+            echo "::warning::Push Docker Hub ignoré : définir DOCKERHUB_USERNAME et DOCKERHUB_TOKEN dans l'environnement GitHub Actions « ${{ inputs.docker_environment }} » (ce job utilise environment: ${{ inputs.docker_environment }}) ou en secrets de dépôt." >&2
+          fi
+
+      - name: Setup Docker Buildx
+        if: inputs.has_java == 'true' || inputs.has_angular == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Référentiel GHCR (minuscules)
+        id: ghcr
+        if: inputs.has_java == 'true' || inputs.has_angular == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          r=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          echo "repository=${r}" >> "${GITHUB_OUTPUT}"
+
+      - name: Login to GitHub Container Registry
+        if: inputs.has_java == 'true' || inputs.has_angular == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: steps.dockerhub.outputs.ready == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tags image Java (GHCR + Docker Hub optionnel)
+        id: tags_java
+        if: inputs.has_java == 'true'
+        env:
+          REPO_LOWER: ${{ steps.ghcr.outputs.repository }}
+          DOCKERHUB_READY: ${{ steps.dockerhub.outputs.ready }}
+          IMAGE_PREFIX: ${{ inputs.java_image_prefix }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "ghcr.io/${REPO_LOWER}:${IMAGE_PREFIX}-${GITHUB_SHA}"
+            echo "ghcr.io/${REPO_LOWER}:${IMAGE_PREFIX}-latest"
+          } > /tmp/java-tags.txt
+          if [[ "${DOCKERHUB_READY}" == "true" && -n "${DOCKERHUB_REPO}" ]]; then
+            echo "${DOCKERHUB_REPO}:${IMAGE_PREFIX}-${GITHUB_SHA}" >> /tmp/java-tags.txt
+            echo "${DOCKERHUB_REPO}:${IMAGE_PREFIX}-latest" >> /tmp/java-tags.txt
+          fi
+          {
+            echo "tags<<EOF"
+            cat /tmp/java-tags.txt
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Tags image Angular (GHCR + Docker Hub optionnel)
+        id: tags_angular
+        if: inputs.has_angular == 'true'
+        env:
+          REPO_LOWER: ${{ steps.ghcr.outputs.repository }}
+          DOCKERHUB_READY: ${{ steps.dockerhub.outputs.ready }}
+          IMAGE_PREFIX: ${{ inputs.angular_image_prefix }}
+          DOCKERHUB_REPO: ${{ inputs.dockerhub_repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "ghcr.io/${REPO_LOWER}:${IMAGE_PREFIX}-${GITHUB_SHA}"
+            echo "ghcr.io/${REPO_LOWER}:${IMAGE_PREFIX}-latest"
+          } > /tmp/angular-tags.txt
+          if [[ "${DOCKERHUB_READY}" == "true" && -n "${DOCKERHUB_REPO}" ]]; then
+            echo "${DOCKERHUB_REPO}:${IMAGE_PREFIX}-${GITHUB_SHA}" >> /tmp/angular-tags.txt
+            echo "${DOCKERHUB_REPO}:${IMAGE_PREFIX}-latest" >> /tmp/angular-tags.txt
+          fi
+          {
+            echo "tags<<EOF"
+            cat /tmp/angular-tags.txt
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push Java image
+        if: inputs.has_java == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.docker_context }}
+          file: ./${{ inputs.java_dockerfile }}
+          push: true
+          tags: ${{ steps.tags_java.outputs.tags }}
+
+      - name: Build and push Angular image
+        if: inputs.has_angular == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.docker_context }}
+          file: ./${{ inputs.angular_dockerfile }}
+          push: true
+          tags: ${{ steps.tags_angular.outputs.tags }}

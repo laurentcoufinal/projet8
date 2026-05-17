@@ -1,0 +1,84 @@
+name: Detect stacks
+
+on:
+  workflow_call:
+    inputs:
+      java_enabled:
+        type: boolean
+        required: true
+      java_project_dir:
+        type: string
+        required: true
+      angular_enabled:
+        type: boolean
+        required: true
+      angular_project_dir:
+        type: string
+        required: true
+      java_version:
+        type: string
+        required: true
+      node_version:
+        type: string
+        required: true
+    outputs:
+      has_java:
+        description: Projet Java détecté
+        value: ${{ jobs.detect.outputs.has_java }}
+      has_angular:
+        description: Projet Angular détecté
+        value: ${{ jobs.detect.outputs.has_angular }}
+      java_version:
+        value: ${{ jobs.detect.outputs.java_version }}
+      node_version:
+        value: ${{ jobs.detect.outputs.node_version }}
+
+jobs:
+  detect:
+    name: Détection des projets
+    runs-on: ubuntu-latest
+    outputs:
+      has_java: ${{ steps.detect.outputs.has_java }}
+      has_angular: ${{ steps.detect.outputs.has_angular }}
+      java_version: ${{ steps.meta.outputs.java_version }}
+      node_version: ${{ steps.meta.outputs.node_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Versions
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "java_version=${{ inputs.java_version }}" >> "${GITHUB_OUTPUT}"
+          echo "node_version=${{ inputs.node_version }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Detect project types
+        id: detect
+        shell: bash
+        env:
+          JAVA_DIR: ${{ inputs.java_project_dir }}
+          ANGULAR_DIR: ${{ inputs.angular_project_dir }}
+          JAVA_ENABLED: ${{ inputs.java_enabled }}
+          ANGULAR_ENABLED: ${{ inputs.angular_enabled }}
+        run: |
+          set -euo pipefail
+          has_java=false
+          has_angular=false
+
+          if [[ "${JAVA_ENABLED}" == "true" && -f "${JAVA_DIR}/build.gradle" && -x "${JAVA_DIR}/gradlew" ]]; then
+            has_java=true
+          fi
+          if [[ "${ANGULAR_ENABLED}" == "true" && -f "${ANGULAR_DIR}/package.json" ]]; then
+            has_angular=true
+          fi
+
+          echo "has_java=${has_java}" >> "${GITHUB_OUTPUT}"
+          echo "has_angular=${has_angular}" >> "${GITHUB_OUTPUT}"
+
+      - name: Fail if no supported project found
+        if: steps.detect.outputs.has_java != 'true' && steps.detect.outputs.has_angular != 'true'
+        run: |
+          echo "Aucun projet Java ou Angular détecté avec la convention attendue." >&2
+          exit 1

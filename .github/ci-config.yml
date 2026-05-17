@@ -1,0 +1,44 @@
+# Configuration du pipeline CI modulaire (ci-pipeline.yml)
+# Ajuster les chemins / versions pour d'autres stacks sans toucher aux workflows.
+
+defaults:
+  java_version: "21"
+  node_version: "22"
+  test_results_dir: test-results
+
+paths_ignore:
+  - README.md
+  - test-results/
+  - .gitignore
+
+stacks:
+  java:
+    enabled: true
+    project_dir: java/G-rez-l-int-gration-et-la-livraison-continue-Application-Java
+    detect_files:
+      - build.gradle
+      - gradlew
+    java_version: "21"
+
+  angular:
+    enabled: true
+    project_dir: angular/G-rez-l-int-gration-et-la-livraison-continue-Application-Angular
+    detect_files:
+      - package.json
+    node_version: "22"
+    package_lock: package-lock.json
+
+docker:
+  environment: dev
+  context: .
+  java:
+    dockerfile: docker/java.Dockerfile
+    image_prefix: java
+  angular:
+    dockerfile: docker/angular.Dockerfile
+    image_prefix: angular
+  dockerhub:
+    repository: laurentcoufinal/projet8
+
+report:
+  check_name: CI - Test report
