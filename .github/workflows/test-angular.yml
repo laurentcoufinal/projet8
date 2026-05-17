@@ -53,18 +53,16 @@ jobs:
           set -euo pipefail
           dest="${{ inputs.test_results_dir }}/angular"
           mkdir -p "${dest}"
-          for src in \
-            "${{ inputs.project_dir }}/reports" \
-            "${{ github.workspace }}/${{ inputs.test_results_dir }}/angular"; do
-            if [[ -d "${src}" ]]; then
-              shopt -s nullglob
-              files=("${src}"/*.xml)
-              shopt -u nullglob
-              if ((${#files[@]})); then
-                cp "${files[@]}" "${dest}/"
-              fi
+          # Source unique: rapports Karma dans le projet Angular.
+          src="${{ inputs.project_dir }}/reports"
+          if [[ -d "${src}" ]]; then
+            shopt -s nullglob
+            files=("${src}"/*.xml)
+            shopt -u nullglob
+            if ((${#files[@]})); then
+              cp "${files[@]}" "${dest}/"
             fi
-          done
+          fi
           # #region agent log
           _ts=$(($(date +%s) * 1000))
           _n=0
