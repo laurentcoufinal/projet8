@@ -40,6 +40,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-pyyaml
+          restore-keys: |
+            pip-${{ runner.os }}-
+
       - name: Parse ci-config.yml
         id: cfg
         shell: bash

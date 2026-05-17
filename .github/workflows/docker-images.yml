@@ -152,6 +152,8 @@ jobs:
           file: ./${{ inputs.java_dockerfile }}
           push: true
           tags: ${{ steps.tags_java.outputs.tags }}
+          cache-from: type=gha,scope=projet8-java
+          cache-to: type=gha,scope=projet8-java,mode=max
 
       - name: Build and push Angular image
         if: inputs.has_angular == 'true'
@@ -161,3 +163,5 @@ jobs:
           file: ./${{ inputs.angular_dockerfile }}
           push: true
           tags: ${{ steps.tags_angular.outputs.tags }}
+          cache-from: type=gha,scope=projet8-angular
+          cache-to: type=gha,scope=projet8-angular,mode=max

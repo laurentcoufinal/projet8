@@ -27,6 +27,9 @@ jobs:
           distribution: temurin
           java-version: ${{ inputs.java_version }}
           cache: gradle
+          cache-dependency-path: |
+            ${{ inputs.project_dir }}/build.gradle
+            ${{ inputs.project_dir }}/gradle/wrapper/gradle-wrapper.properties
 
       - name: Prepare test-results (Java)
         run: |
