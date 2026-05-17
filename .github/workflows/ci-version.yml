@@ -219,7 +219,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: junit-xml-reports
-          path: test-results/**/*.xml
+          path: |
+            test-results/java
+            test-results/angular
           if-no-files-found: warn
 
       - name: Publish JUnit report in GitHub UI
