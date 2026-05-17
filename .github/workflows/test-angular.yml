@@ -46,6 +46,36 @@ jobs:
           KARMA_JUNIT_OUTPUT_DIR: ${{ github.workspace }}/${{ inputs.test_results_dir }}/angular
         run: npm test
 
+      - name: Collect Angular JUnit XML reports
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${{ inputs.test_results_dir }}/angular"
+          mkdir -p "${dest}"
+          for src in \
+            "${{ inputs.project_dir }}/reports" \
+            "${{ github.workspace }}/${{ inputs.test_results_dir }}/angular"; do
+            if [[ -d "${src}" ]]; then
+              shopt -s nullglob
+              files=("${src}"/*.xml)
+              shopt -u nullglob
+              if ((${#files[@]})); then
+                cp "${files[@]}" "${dest}/"
+              fi
+            fi
+          done
+          # #region agent log
+          _ts=$(($(date +%s) * 1000))
+          _n=0
+          shopt -s nullglob
+          _files=("${dest}"/*.xml)
+          shopt -u nullglob
+          _n=${#_files[@]}
+          mkdir -p .cursor
+          printf '%s\n' "{\"sessionId\":\"af93e2\",\"runId\":\"${GITHUB_RUN_ID}\",\"hypothesisId\":\"H5\",\"location\":\"test-angular.yml:Collect\",\"message\":\"xml files collected\",\"data\":{\"dest\":\"${dest}\",\"xml_count\":${_n}},\"timestamp\":${_ts}}" >> ".cursor/debug-af93e2.log" || true
+          # #endregion
+
       - name: Upload JUnit (Angular)
         if: always()
         uses: actions/upload-artifact@v4

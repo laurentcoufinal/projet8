@@ -5,12 +5,12 @@ on:
     inputs:
       java_version:
         description: "Version Java (ex: 21)"
-        required: false
+        required: true
         default: "21"
         type: string
       node_version:
         description: "Version Node.js (ex: 22)"
-        required: false
+        required: true
         default: "22"
         type: string
 
@@ -160,6 +160,26 @@ jobs:
           KARMA_JUNIT_OUTPUT_DIR: ${{ github.workspace }}/${{ env.TEST_RESULTS_DIR }}/angular
         run: npm test
 
+      - name: Collect Angular JUnit XML reports
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${{ env.TEST_RESULTS_DIR }}/angular"
+          mkdir -p "${dest}"
+          for src in \
+            "${{ env.ANGULAR_DIR }}/reports" \
+            "${{ github.workspace }}/${{ env.TEST_RESULTS_DIR }}/angular"; do
+            if [[ -d "${src}" ]]; then
+              shopt -s nullglob
+              files=("${src}"/*.xml)
+              shopt -u nullglob
+              if ((${#files[@]})); then
+                cp "${files[@]}" "${dest}/"
+              fi
+            fi
+          done
+
       - name: Upload JUnit (Angular)
         if: always()
         uses: actions/upload-artifact@v4
@@ -179,7 +199,7 @@ jobs:
           mkdir -p test-results/java test-results/angular
 
       - name: Download JUnit (Java)
-        if: needs.detect.outputs.has_java == 'true'
+        if: needs.detect.outputs.has_java == 'true' && needs.test-java.result == 'success'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -187,7 +207,7 @@ jobs:
           path: test-results/java
 
       - name: Download JUnit (Angular)
-        if: needs.detect.outputs.has_angular == 'true'
+        if: needs.detect.outputs.has_angular == 'true' && needs.test-angular.result == 'success'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:

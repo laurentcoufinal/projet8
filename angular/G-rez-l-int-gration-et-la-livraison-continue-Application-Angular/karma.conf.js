@@ -35,7 +35,7 @@ module.exports = function (config) {
     },
     reporters: ['progress', 'junit'],
     junitReporter: {
-      outputDir: 'reports',
+      outputDir: process.env.KARMA_JUNIT_OUTPUT_DIR || 'reports',
     },
     port: 9876,
     colors: true,

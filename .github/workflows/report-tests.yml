@@ -13,6 +13,14 @@ on:
         type: string
         required: false
         default: CI - Test report
+      test_java_result:
+        type: string
+        required: false
+        default: skipped
+      test_angular_result:
+        type: string
+        required: false
+        default: skipped
 
 jobs:
   report-tests:
@@ -24,7 +32,7 @@ jobs:
           mkdir -p test-results/java test-results/angular
 
       - name: Download JUnit (Java)
-        if: inputs.has_java == 'true'
+        if: inputs.has_java == 'true' && inputs.test_java_result == 'success'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -32,7 +40,7 @@ jobs:
           path: test-results/java
 
       - name: Download JUnit (Angular)
-        if: inputs.has_angular == 'true'
+        if: inputs.has_angular == 'true' && inputs.test_angular_result == 'success'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:

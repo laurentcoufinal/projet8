@@ -122,11 +122,67 @@ jobs:
     name: Rapport tests
     needs: [load-config, detect, test-java, test-angular]
     if: always() && needs.detect.result == 'success'
-    uses: ./.github/workflows/report-tests.yml
-    with:
-      has_java: ${{ needs.detect.outputs.has_java }}
-      has_angular: ${{ needs.detect.outputs.has_angular }}
-      check_name: ${{ needs.load-config.outputs.report_check_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug — préconditions téléchargement artefacts
+        shell: bash
+        env:
+          HAS_JAVA: ${{ needs.detect.outputs.has_java }}
+          HAS_ANGULAR: ${{ needs.detect.outputs.has_angular }}
+          TEST_JAVA_RESULT: ${{ needs.test-java.result }}
+          TEST_ANGULAR_RESULT: ${{ needs.test-angular.result }}
+        run: |
+          set -euo pipefail
+          # #region agent log
+          mkdir -p .cursor
+          _ts=$(($(date +%s) * 1000))
+          printf '%s\n' "{\"sessionId\":\"af93e2\",\"runId\":\"${GITHUB_RUN_ID}\",\"hypothesisId\":\"H1-H5\",\"location\":\"ci-pipeline.yml:report-tests\",\"message\":\"preconditions download\",\"data\":{\"has_java\":\"${HAS_JAVA}\",\"has_angular\":\"${HAS_ANGULAR}\",\"test_java_result\":\"${TEST_JAVA_RESULT}\",\"test_angular_result\":\"${TEST_ANGULAR_RESULT}\"},\"timestamp\":${_ts}}" >> ".cursor/debug-af93e2.log"
+          # #endregion
+          {
+            echo "## Debug report-tests"
+            echo "- has_java: ${HAS_JAVA}"
+            echo "- has_angular: ${HAS_ANGULAR}"
+            echo "- test-java.result: ${TEST_JAVA_RESULT}"
+            echo "- test-angular.result: ${TEST_ANGULAR_RESULT}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Prepare report directories
+        run: |
+          mkdir -p test-results/java test-results/angular
+
+      - name: Download JUnit (Java)
+        if: needs.detect.outputs.has_java == 'true' && needs.test-java.result == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-xml-java
+          path: test-results/java
+
+      - name: Download JUnit (Angular)
+        if: needs.detect.outputs.has_angular == 'true' && needs.test-angular.result == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: junit-xml-angular
+          path: test-results/angular
+
+      - name: Upload test XML artifacts (agrégé)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml-reports
+          path: test-results/**/*.xml
+          if-no-files-found: warn
+
+      - name: Publish JUnit report in GitHub UI
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results/**/*.xml
+          check_name: ${{ needs.load-config.outputs.report_check_name }}
 
   docker-images:
     name: Images Docker
