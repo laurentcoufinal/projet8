@@ -1,0 +1,39 @@
+# Contexte CI (racine) — docker/java.Dockerfile et docker/angular.Dockerfile
+
+# VCS / CI / IDE
+.git
+.github
+.cursor
+.vscode
+.idea
+
+# CI / tests / docs
+test-results
+backup
+plan-de-test
+run-tests.sh
+README.md
+
+# Compose (non requis dans les images)
+docker-compose*.yml
+
+# Stack Java — artefacts (conserver gradle/wrapper et src/)
+java/**/build
+java/**/.gradle
+java/**/bin
+java/**/out
+java/**/.openapi-generator
+java/**/java-generated
+
+# Stack Angular — artefacts
+angular/**/node_modules
+angular/**/dist
+angular/**/coverage
+angular/**/.angular
+angular/**/reports
+angular/**/tmp
+angular/**/bazel-out
+
+# Secrets
+.env
+**/.env

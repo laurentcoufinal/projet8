@@ -1,0 +1,35 @@
+# Build local (context: .)
+
+HELP.md
+.gradle
+build/
+bin/
+out/
+
+# IDE
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+.idea
+*.iws
+*.iml
+*.ipr
+.vscode
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# OpenAPI Generator
+.openapi-generator/
+java-generated/
+
+# Compose (non requis dans l'image)
+docker-compose.yml

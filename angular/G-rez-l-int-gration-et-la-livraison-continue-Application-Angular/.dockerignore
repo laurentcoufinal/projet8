@@ -1,0 +1,42 @@
+# Build local (context: .)
+
+# Compiled output
+dist
+tmp
+out-tsc
+bazel-out
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Karma / tests
+coverage
+reports
+
+# Angular cache
+.angular
+
+# IDE
+.idea
+.project
+.classpath
+.c9
+*.launch
+.settings
+*.sublime-workspace
+.vscode
+.history
+
+# Misc
+.sass-cache
+connect.lock
+libpeerconnection.log
+testem.log
+typings
+.DS_Store
+Thumbs.db
+
+# Compose (non requis dans l'image)
+docker-compose.yml
