@@ -150,10 +150,14 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Prepare report directories
+        env:
+          JAVA_STAGING: ${{ runner.temp }}/junit-java
+          ANGULAR_STAGING: ${{ runner.temp }}/junit-angular
         run: |
-          rm -rf test-results/ .ci-staging/
+          rm -rf test-results/
           mkdir -p test-results/java test-results/angular
-          mkdir -p .ci-staging/java .ci-staging/angular
+          rm -rf "${JAVA_STAGING}" "${ANGULAR_STAGING}"
+          mkdir -p "${JAVA_STAGING}" "${ANGULAR_STAGING}"
 
       - name: Download JUnit (Java)
         if: needs.detect.outputs.has_java == 'true' && needs.test-java.result == 'success'
@@ -161,7 +165,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: junit-xml-java
-          path: .ci-staging/java
+          path: ${{ runner.temp }}/junit-java
 
       - name: Download JUnit (Angular)
         if: needs.detect.outputs.has_angular == 'true' && needs.test-angular.result == 'success'
@@ -169,21 +173,33 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: junit-xml-angular
-          path: .ci-staging/angular
+          path: ${{ runner.temp }}/junit-angular
 
       - name: Stage downloaded JUnit reports
         if: always()
+        env:
+          JAVA_STAGING: ${{ runner.temp }}/junit-java
+          ANGULAR_STAGING: ${{ runner.temp }}/junit-angular
         shell: bash
         run: |
           set -euo pipefail
-          for stack in java angular; do
-            src=".ci-staging/${stack}"
-            dest="test-results/${stack}"
+          stage_junit_xml() {
+            local src="$1"
+            local dest="$2"
             mkdir -p "${dest}"
-            if [[ -d "${src}" ]]; then
-              find "${src}" -name '*.xml' -print0 | xargs -0 -r cp -t "${dest}"
-            fi
-          done
+            [[ -d "${src}" ]] || return 0
+            while IFS= read -r -d '' f; do
+              local base target
+              base=$(basename "$f")
+              target="${dest}/${base}"
+              if [[ -f "${target}" ]] && [[ "$(realpath "$f")" == "$(realpath "${target}")" ]]; then
+                continue
+              fi
+              cp "$f" "${target}"
+            done < <(find "${src}" -name '*.xml' -print0)
+          }
+          stage_junit_xml "${JAVA_STAGING}" "test-results/java"
+          stage_junit_xml "${ANGULAR_STAGING}" "test-results/angular"
 
       - name: Upload test XML artifacts (agrégé)
         if: always()
