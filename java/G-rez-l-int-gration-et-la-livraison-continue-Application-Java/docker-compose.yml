@@ -19,8 +19,13 @@ services:
       POSTGRES_USER: workshops_user
       POSTGRES_PASSWORD: oc2024
       POSTGRES_DB: workshopsdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U workshops_user -d workshopsdb"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+volumes:
+  postgres_data:
